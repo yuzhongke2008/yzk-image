@@ -1,0 +1,19 @@
+{
+  "name": "z-image",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "dev:web": "turbo run dev --filter=@z-image/web",
+    "dev:api": "turbo run dev --filter=@z-image/api",
+    "build:web": "turbo run build --filter=@z-image/web",
+    "build:api": "turbo run build --filter=@z-image/api"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  }
+}
