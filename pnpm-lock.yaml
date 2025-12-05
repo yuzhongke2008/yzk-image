@@ -22,7 +22,7 @@ importers:
         version: 4.10.7
       openai:
         specifier: ^4.76.0
-        version: 4.104.0(ws@8.18.0)
+        version: 4.104.0(ws@8.18.0)(zod@4.1.13)
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20241218.0
@@ -63,9 +63,15 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      hono:
+        specifier: ^4.6.0
+        version: 4.10.7
       lucide-react:
         specifier: ^0.555.0
         version: 0.555.0(react@19.2.1)
+      openai:
+        specifier: ^4.76.0
+        version: 4.104.0(ws@8.18.0)(zod@4.1.13)
       react:
         specifier: ^19.2.0
         version: 19.2.1
@@ -4154,7 +4160,7 @@ snapshots:
 
   ohash@2.0.11: {}
 
-  openai@4.104.0(ws@8.18.0):
+  openai@4.104.0(ws@8.18.0)(zod@4.1.13):
     dependencies:
       '@types/node': 18.19.130
       '@types/node-fetch': 2.6.13
@@ -4165,6 +4171,7 @@ snapshots:
       node-fetch: 2.7.0
     optionalDependencies:
       ws: 8.18.0
+      zod: 4.1.13
     transitivePeerDependencies:
       - encoding
 

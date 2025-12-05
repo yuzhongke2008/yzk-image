@@ -33,7 +33,7 @@ const ASPECT_RATIOS: Record<string, [number, number]> = {
 }
 
 export default function ImageGenerator() {
-  const [apiKey, setApiKey] = useState(() => sessionStorage.getItem('z-image-api-key') || '')
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('z-image-api-key') || '')
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT)
   const [negativePrompt, setNegativePrompt] = useState(DEFAULT_NEGATIVE_PROMPT)
   const [model, setModel] = useState('z-image-turbo')
@@ -46,7 +46,7 @@ export default function ImageGenerator() {
   const [elapsed, setElapsed] = useState(0)
 
   useEffect(() => {
-    sessionStorage.setItem('z-image-api-key', apiKey)
+    localStorage.setItem('z-image-api-key', apiKey)
   }, [apiKey])
 
   useEffect(() => {
@@ -88,7 +88,7 @@ export default function ImageGenerator() {
 
     try {
       addStatus('Sending request to API...')
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/generate`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

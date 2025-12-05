@@ -6,7 +6,7 @@ type Bindings = {
   CORS_ORIGINS?: string
 }
 
-const app = new Hono<{ Bindings: Bindings }>()
+const app = new Hono<{ Bindings: Bindings }>().basePath('/api')
 
 app.use('/*', async (c, next) => {
   const origins = c.env?.CORS_ORIGINS?.split(',') || ['http://localhost:5173', 'http://localhost:3000']
