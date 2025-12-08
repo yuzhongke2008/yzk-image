@@ -13,17 +13,15 @@ export interface GeneratedImage {
   isUpscaled?: boolean;
 }
 
-export interface FlowSession {
-  id: string;
-  name: string;
-  createdAt: number;
-  updatedAt: number;
+export interface FlowState {
   images: GeneratedImage[];
+  updatedAt: number;
 }
 
 const DB_NAME = "zenith-flow-db";
-const DB_VERSION = 1;
-const SESSIONS_STORE = "sessions";
+const DB_VERSION = 2;
+const STATE_STORE = "flowState";
+const STATE_KEY = "current";
 
 let dbInstance: IDBPDatabase | null = null;
 
@@ -32,9 +30,13 @@ async function getDB(): Promise<IDBPDatabase> {
 
   dbInstance = await openDB(DB_NAME, DB_VERSION, {
     upgrade(db) {
-      if (!db.objectStoreNames.contains(SESSIONS_STORE)) {
-        const store = db.createObjectStore(SESSIONS_STORE, { keyPath: "id" });
-        store.createIndex("updatedAt", "updatedAt");
+      // Clean up old stores
+      if (db.objectStoreNames.contains("sessions")) {
+        db.deleteObjectStore("sessions");
+      }
+      // Create new simple store
+      if (!db.objectStoreNames.contains(STATE_STORE)) {
+        db.createObjectStore(STATE_STORE);
       }
     },
   });
@@ -42,56 +44,43 @@ async function getDB(): Promise<IDBPDatabase> {
   return dbInstance;
 }
 
-export async function loadFlowSessions(): Promise<FlowSession[]> {
+export async function loadFlowState(): Promise<FlowState | null> {
   try {
     const db = await getDB();
-    const sessions = await db.getAll(SESSIONS_STORE);
-    // Sort by updatedAt descending (most recent first)
-    return sessions.sort((a, b) => b.updatedAt - a.updatedAt);
-  } catch {
-    return [];
+    const state = await db.get(STATE_STORE, STATE_KEY);
+    return state || null;
+  } catch (e) {
+    console.error("Failed to load flow state:", e);
+    return null;
   }
 }
 
-export async function saveFlowSession(session: FlowSession): Promise<void> {
-  const db = await getDB();
-  await db.put(SESSIONS_STORE, session);
-}
-
-export async function createFlowSession(): Promise<FlowSession> {
-  const session: FlowSession = {
-    id: `flow-${Date.now()}`,
-    name: `Flow ${new Date().toLocaleString("zh-CN")}`,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-    images: [],
-  };
-  await saveFlowSession(session);
-  return session;
-}
-
-export async function updateFlowSession(
-  sessionId: string,
-  images: GeneratedImage[]
-): Promise<void> {
-  const db = await getDB();
-  const session = await db.get(SESSIONS_STORE, sessionId);
-  if (session) {
-    session.images = images;
-    session.updatedAt = Date.now();
-    await db.put(SESSIONS_STORE, session);
+export async function saveFlowState(images: GeneratedImage[]): Promise<void> {
+  try {
+    const db = await getDB();
+    const state: FlowState = {
+      images,
+      updatedAt: Date.now(),
+    };
+    await db.put(STATE_STORE, state, STATE_KEY);
+  } catch (e) {
+    console.error("Failed to save flow state:", e);
   }
 }
 
-export async function deleteFlowSession(sessionId: string): Promise<void> {
-  const db = await getDB();
-  await db.delete(SESSIONS_STORE, sessionId);
+export async function clearFlowState(): Promise<void> {
+  try {
+    const db = await getDB();
+    await db.delete(STATE_STORE, STATE_KEY);
+  } catch (e) {
+    console.error("Failed to clear flow state:", e);
+  }
 }
 
 // Flow input settings storage (keep in localStorage - small data)
 export interface FlowInputSettings {
   aspectRatioIndex: number;
-  resolutionIndex: number; // 0=1K, 1=2K - independent of aspect ratio
+  resolutionIndex: number;
   prompt: string;
 }
 
