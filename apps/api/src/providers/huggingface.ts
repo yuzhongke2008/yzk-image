@@ -69,7 +69,10 @@ async function callGradioApi(baseUrl: string, endpoint: string, data: unknown[],
 }
 
 /** Model-specific Gradio configurations */
-const MODEL_CONFIGS: Record<string, { endpoint: string; buildData: (r: ProviderGenerateRequest, seed: number) => unknown[] }> = {
+const MODEL_CONFIGS: Record<
+  string,
+  { endpoint: string; buildData: (r: ProviderGenerateRequest, seed: number) => unknown[] }
+> = {
   'z-image-turbo': {
     endpoint: 'generate_image',
     buildData: (r, seed) => [r.prompt, r.height, r.width, r.steps ?? 9, seed, false],

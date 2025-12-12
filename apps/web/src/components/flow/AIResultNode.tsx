@@ -1,8 +1,8 @@
-import { memo, useEffect, useState, useRef } from 'react'
-import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { Sparkles, Download, Trash2, Eye, EyeOff } from 'lucide-react'
+import { type ProviderType, loadSettings } from '@/lib/constants'
 import { loadAllTokens } from '@/lib/crypto'
-import { loadSettings, type ProviderType } from '@/lib/constants'
+import { Handle, type NodeProps, Position } from '@xyflow/react'
+import { Download, Eye, EyeOff, Sparkles, Trash2 } from 'lucide-react'
+import { memo, useEffect, useRef, useState } from 'react'
 
 import type { GeneratedImage } from '@/lib/flow-storage'
 
@@ -118,7 +118,15 @@ function AIResultNode({ id, data }: NodeProps) {
       }
 
       try {
-        const url = await generateImageApi(prompt, width, height, provider, token, selectedModel, seed)
+        const url = await generateImageApi(
+          prompt,
+          width,
+          height,
+          provider,
+          token,
+          selectedModel,
+          seed
+        )
         setImageUrl(url)
         setLoading(false)
         const duration = (Date.now() - startTimeRef.current) / 1000

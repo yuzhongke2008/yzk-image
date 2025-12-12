@@ -55,7 +55,10 @@ export class ModelScopeProvider implements ImageProvider {
     })
 
     if (!response.ok) {
-      const errData = await response.json().catch(() => ({})) as { message?: string; errors?: { message?: string } }
+      const errData = (await response.json().catch(() => ({}))) as {
+        message?: string
+        errors?: { message?: string }
+      }
       const errMsg = errData.errors?.message || errData.message || `HTTP ${response.status}`
       // console.error('[ModelScope] Error response:', errData)
       throw new Error(errMsg)

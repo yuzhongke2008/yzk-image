@@ -1,9 +1,9 @@
-import { useImageGenerator } from '@/hooks/useImageGenerator'
-import { Header } from '@/components/feature/Header'
 import { ApiConfigAccordion } from '@/components/feature/ApiConfigAccordion'
-import { PromptCard } from '@/components/feature/PromptCard'
+import { Header } from '@/components/feature/Header'
 import { ImageResultCard } from '@/components/feature/ImageResultCard'
+import { PromptCard } from '@/components/feature/PromptCard'
 import { StatusCard } from '@/components/feature/StatusCard'
+import { useImageGenerator } from '@/hooks/useImageGenerator'
 
 export default function ImageGenerator() {
   const {

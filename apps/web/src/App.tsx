@@ -1,7 +1,7 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Toaster } from '@/components/ui/sonner'
-import ImageGenerator from './pages/ImageGenerator'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import FlowPage from './pages/FlowPage'
+import ImageGenerator from './pages/ImageGenerator'
 
 function App() {
   return (

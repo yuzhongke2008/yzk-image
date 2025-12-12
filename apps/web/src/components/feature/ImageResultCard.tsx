@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ImageIcon, Download, Info, Trash2, Eye, EyeOff, Loader2 } from 'lucide-react'
 import type { ProviderType } from '@/lib/constants'
+import { Download, Eye, EyeOff, ImageIcon, Info, Loader2, Trash2 } from 'lucide-react'
 
 interface ImageResultCardProps {
   imageUrl: string | null

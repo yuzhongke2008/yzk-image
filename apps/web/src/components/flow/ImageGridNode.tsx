@@ -1,8 +1,8 @@
-import { memo, useEffect, useState, useRef } from 'react'
-import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { decryptTokenFromStore } from '@/lib/crypto'
+import { Handle, type NodeProps, Position } from '@xyflow/react'
 import { motion } from 'framer-motion'
 import { Loader2 } from 'lucide-react'
-import { decryptTokenFromStore } from '@/lib/crypto'
+import { memo, useEffect, useRef, useState } from 'react'
 
 export type ImageGridNodeData = {
   prompt: string

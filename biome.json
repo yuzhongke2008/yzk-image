@@ -55,6 +55,14 @@
     }
   ],
   "files": {
-    "ignore": ["node_modules", "dist", ".turbo", "coverage", "*.min.js", "pnpm-lock.yaml", ".wrangler"]
+    "ignore": [
+      "node_modules",
+      "dist",
+      ".turbo",
+      "coverage",
+      "*.min.js",
+      "pnpm-lock.yaml",
+      ".wrangler"
+    ]
   }
 }

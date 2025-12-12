@@ -1,6 +1,6 @@
-import { memo } from 'react'
-import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { Handle, type NodeProps, Position } from '@xyflow/react'
 import { User } from 'lucide-react'
+import { memo } from 'react'
 
 export type UserPromptNodeData = {
   prompt: string

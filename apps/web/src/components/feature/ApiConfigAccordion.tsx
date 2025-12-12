@@ -1,12 +1,11 @@
-import { Settings } from 'lucide-react'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -16,6 +15,7 @@ import {
 } from '@/components/ui/select'
 import { PROVIDER_CONFIGS, PROVIDER_OPTIONS, type ProviderType } from '@/lib/constants'
 import type { ModelConfig } from '@z-image/shared'
+import { Settings } from 'lucide-react'
 
 interface ApiConfigAccordionProps {
   provider: ProviderType

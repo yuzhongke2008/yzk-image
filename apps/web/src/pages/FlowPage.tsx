@@ -1,40 +1,40 @@
-import { useCallback, useState, useRef, useEffect } from 'react'
 import {
-  ReactFlow,
-  Controls,
   Background,
-  useNodesState,
-  useEdgesState,
-  addEdge,
-  useReactFlow,
-  ReactFlowProvider,
-  type Connection,
-  type Node,
-  type Edge,
   BackgroundVariant,
+  type Connection,
+  Controls,
+  type Edge,
+  type Node,
+  ReactFlow,
+  ReactFlowProvider,
+  addEdge,
+  useEdgesState,
+  useNodesState,
+  useReactFlow,
 } from '@xyflow/react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import '@xyflow/react/dist/style.css'
-import { ArrowLeft, Settings, X, Download, Trash2 } from 'lucide-react'
-import { Link } from 'react-router-dom'
-import { encryptAndStoreToken, loadAllTokens } from '@/lib/crypto'
+import { ApiConfigAccordion } from '@/components/feature/ApiConfigAccordion'
+import AIResultNode, { type AIResultNodeData } from '@/components/flow/AIResultNode'
+import FloatingInput from '@/components/flow/FloatingInput'
+import UserPromptNode, { type UserPromptNodeData } from '@/components/flow/UserPromptNode'
+import { getLayoutedElements } from '@/components/flow/layout'
 import {
-  loadFlowState,
-  saveFlowState,
-  clearFlowState,
-  type GeneratedImage,
-} from '@/lib/flow-storage'
-import {
+  type ProviderType,
+  getDefaultModel,
+  getModelsByProvider,
   loadSettings,
   saveSettings,
-  type ProviderType,
-  getModelsByProvider,
-  getDefaultModel,
 } from '@/lib/constants'
-import UserPromptNode, { type UserPromptNodeData } from '@/components/flow/UserPromptNode'
-import AIResultNode, { type AIResultNodeData } from '@/components/flow/AIResultNode'
-import { getLayoutedElements } from '@/components/flow/layout'
-import FloatingInput from '@/components/flow/FloatingInput'
-import { ApiConfigAccordion } from '@/components/feature/ApiConfigAccordion'
+import { encryptAndStoreToken, loadAllTokens } from '@/lib/crypto'
+import {
+  type GeneratedImage,
+  clearFlowState,
+  loadFlowState,
+  saveFlowState,
+} from '@/lib/flow-storage'
+import { ArrowLeft, Download, Settings, Trash2, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 const nodeTypes = {
   userPrompt: UserPromptNode,
@@ -361,10 +361,7 @@ function FlowCanvas() {
         </div>
       )}
 
-      <FloatingInput
-        onSubmit={addNode}
-        providerLabel={`${provider} / ${model}`}
-      />
+      <FloatingInput onSubmit={addNode} providerLabel={`${provider} / ${model}`} />
     </div>
   )
 }
