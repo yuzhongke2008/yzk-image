@@ -8,7 +8,7 @@ import {
   ReactFlowProvider,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { ArrowLeft, Download, Loader2, Settings, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Download, Github, Loader2, Settings, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
@@ -418,6 +418,15 @@ function FlowCanvas() {
             <ArrowLeft className="w-4 h-4" />
             <span className="text-sm">{t('common.back')}</span>
           </Link>
+          <a
+            href="https://github.com/WuMingDao/zenith-image-generator"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-3 py-1.5 border border-zinc-700 rounded-lg text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 transition-colors"
+          >
+            <Github className="w-4 h-4" />
+            <span className="text-sm">GitHub</span>
+          </a>
           <LanguageSwitcher />
         </div>
 
