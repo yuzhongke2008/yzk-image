@@ -71,6 +71,9 @@ git clone https://github.com/WuMingDao/zenith-image-generator.git
 cd zenith-image-generator
 pnpm install
 
+# 配置环境变量
+cp apps/web/.env.example apps/web/.env
+
 # 终端 1
 pnpm dev:api
 
