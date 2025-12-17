@@ -182,6 +182,51 @@ function FlowCanvas() {
     [updateLLMSettings]
   )
 
+  const setCustomOptimizeConfig = useCallback(
+    (config: Partial<{ baseUrl: string; apiKey: string; model: string }>) => {
+      setLLMSettings((prev) => {
+        const newSettings = {
+          ...prev,
+          customOptimizeConfig: { ...prev.customOptimizeConfig, ...config },
+        }
+        saveLLMSettings(newSettings)
+        return newSettings
+      })
+    },
+    []
+  )
+
+  const setCustomTranslateConfig = useCallback(
+    (config: Partial<{ baseUrl: string; apiKey: string; model: string }>) => {
+      setLLMSettings((prev) => {
+        const newSettings = {
+          ...prev,
+          customTranslateConfig: { ...prev.customTranslateConfig, ...config },
+        }
+        saveLLMSettings(newSettings)
+        return newSettings
+      })
+    },
+    []
+  )
+
+  const setTranslateProvider = useCallback(
+    (provider: LLMProviderType) => {
+      updateLLMSettings({
+        translateProvider: provider,
+        translateModel: getDefaultLLMModel(provider),
+      })
+    },
+    [updateLLMSettings]
+  )
+
+  const setTranslateModel = useCallback(
+    (model: string) => {
+      updateLLMSettings({ translateModel: model })
+    },
+    [updateLLMSettings]
+  )
+
   // Optimize prompt handler
   const handleOptimize = useCallback(
     async (prompt: string): Promise<string | null> => {
@@ -241,7 +286,31 @@ function FlowCanvas() {
 
       setIsTranslating(true)
       try {
-        const result = await translatePrompt(prompt)
+        // Get token for translate provider
+        let token: string | undefined
+        switch (llmSettings.translateProvider) {
+          case 'gitee-llm':
+            token = await decryptTokenFromStore('gitee')
+            break
+          case 'modelscope-llm':
+            token = await decryptTokenFromStore('modelscope')
+            break
+          case 'huggingface-llm':
+            token = await decryptTokenFromStore('huggingface')
+            break
+          case 'deepseek':
+            token = await decryptTokenFromStore('deepseek')
+            break
+        }
+
+        const result = await translatePrompt(
+          {
+            prompt,
+            provider: llmSettings.translateProvider,
+            model: llmSettings.translateModel,
+          },
+          token
+        )
 
         if (result.success) {
           toast.success(t('prompt.translateSuccess'))
@@ -257,7 +326,7 @@ function FlowCanvas() {
         setIsTranslating(false)
       }
     },
-    [isTranslating, t]
+    [isTranslating, t, llmSettings]
   )
 
   // Handle node drag - group dragging for config nodes (real-time)
@@ -534,8 +603,12 @@ function FlowCanvas() {
         llmSettings={llmSettings}
         setLLMProvider={setLLMProvider}
         setLLMModel={setLLMModel}
+        setTranslateProvider={setTranslateProvider}
+        setTranslateModel={setTranslateModel}
         setAutoTranslate={setAutoTranslate}
         setCustomSystemPrompt={setCustomSystemPrompt}
+        setCustomOptimizeConfig={setCustomOptimizeConfig}
+        setCustomTranslateConfig={setCustomTranslateConfig}
       />
 
       {/* Flow Input */}

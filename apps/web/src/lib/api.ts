@@ -8,11 +8,13 @@
 import type {
   ApiErrorCode,
   ApiErrorResponse,
+  CustomLLMConfig,
   GenerateRequest,
   GenerateSuccessResponse,
   LLMProviderType,
   OptimizeRequest,
   OptimizeResponse,
+  TranslateRequest,
   TranslateResponse,
   UpscaleRequest,
   UpscaleResponse,
@@ -249,6 +251,8 @@ export interface OptimizeOptions {
   model?: string
   /** Custom system prompt */
   systemPrompt?: string
+  /** Custom provider configuration (when provider is 'custom') */
+  customConfig?: CustomLLMConfig
 }
 
 /** Map LLM provider to token provider for token rotation */
@@ -276,7 +280,7 @@ async function optimizePromptSingle(
   options: OptimizeOptions,
   token: string | null
 ): Promise<OptimizeResponse> {
-  const { prompt, provider = 'pollinations', lang = 'en', model, systemPrompt } = options
+  const { prompt, provider = 'pollinations', lang = 'en', model, systemPrompt, customConfig } = options
 
   const providerConfig = LLM_PROVIDER_CONFIGS[provider]
   const headers: HeadersInit = { 'Content-Type': 'application/json' }
@@ -285,10 +289,15 @@ async function optimizePromptSingle(
     headers[providerConfig.authHeader] = token
   }
 
+  const body: OptimizeRequest = { prompt, provider, lang, model, systemPrompt }
+  if (provider === 'custom' && customConfig) {
+    body.customConfig = customConfig
+  }
+
   return apiRequest<OptimizeResponse>(`${API_URL}/api/optimize`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ prompt, provider, lang, model, systemPrompt } as OptimizeRequest),
+    body: JSON.stringify(body),
   })
 }
 
@@ -299,7 +308,7 @@ export async function optimizePrompt(
   options: OptimizeOptions,
   tokenOrTokens?: string | string[]
 ): Promise<ApiResponse<OptimizeResponse>> {
-  const { provider = 'pollinations' } = options
+  const { provider = 'pollinations', customConfig } = options
   const providerConfig = LLM_PROVIDER_CONFIGS[provider]
   const tokenProvider = getLLMTokenProvider(provider)
 
@@ -308,6 +317,25 @@ export async function optimizePrompt(
     : tokenOrTokens
       ? [tokenOrTokens]
       : []
+
+  // Custom provider - uses its own API key from customConfig
+  if (provider === 'custom') {
+    if (!customConfig?.baseUrl || !customConfig?.apiKey || !customConfig?.model) {
+      return {
+        success: false,
+        error: 'Please configure custom provider URL, API key, and model',
+      }
+    }
+    try {
+      const data = await optimizePromptSingle(options, null)
+      return { success: true, data }
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Network error',
+      }
+    }
+  }
 
   // Provider doesn't need auth (e.g., pollinations)
   if (!providerConfig?.needsAuth) {
@@ -342,22 +370,140 @@ export async function optimizePrompt(
     : { success: false, error: result.error }
 }
 
+/** Translate prompt options */
+export interface TranslateOptions {
+  /** The prompt to translate */
+  prompt: string
+  /** LLM provider (default: pollinations) */
+  provider?: LLMProviderType
+  /** Specific model to use */
+  model?: string
+  /** Custom provider configuration (when provider is 'custom') */
+  customConfig?: CustomLLMConfig
+}
+
 /**
- * Translate a prompt from Chinese to English
- * Uses Pollinations AI with openai-fast model (free, no auth required)
+ * Internal: Make a single translate API call with specific token
  */
-export async function translatePrompt(prompt: string): Promise<ApiResponse<TranslateResponse>> {
+async function translatePromptSingle(
+  options: TranslateOptions,
+  token: string | null
+): Promise<TranslateResponse> {
+  const { prompt, provider = 'pollinations', model, customConfig } = options
+
+  const providerConfig = LLM_PROVIDER_CONFIGS[provider]
+  const headers: HeadersInit = { 'Content-Type': 'application/json' }
+
+  if (token && providerConfig?.needsAuth && providerConfig?.authHeader) {
+    headers[providerConfig.authHeader] = token
+  }
+
+  const body: TranslateRequest = { prompt, provider, model }
+  if (provider === 'custom' && customConfig) {
+    body.customConfig = customConfig
+  }
+
+  return apiRequest<TranslateResponse>(`${API_URL}/api/translate`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+}
+
+/**
+ * Translate a prompt from Chinese to English with token rotation
+ */
+export async function translatePrompt(
+  options: TranslateOptions,
+  tokenOrTokens?: string | string[]
+): Promise<ApiResponse<TranslateResponse>> {
+  const { provider = 'pollinations', customConfig } = options
+  const providerConfig = LLM_PROVIDER_CONFIGS[provider]
+  const tokenProvider = getLLMTokenProvider(provider)
+
+  const allTokens = Array.isArray(tokenOrTokens)
+    ? tokenOrTokens
+    : tokenOrTokens
+      ? [tokenOrTokens]
+      : []
+
+  // Custom provider - uses its own API key from customConfig
+  if (provider === 'custom') {
+    if (!customConfig?.baseUrl || !customConfig?.apiKey || !customConfig?.model) {
+      return {
+        success: false,
+        error: 'Please configure custom provider URL, API key, and model',
+      }
+    }
+    try {
+      const data = await translatePromptSingle(options, null)
+      return { success: true, data }
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Network error',
+      }
+    }
+  }
+
+  // Provider doesn't need auth (e.g., pollinations)
+  if (!providerConfig?.needsAuth) {
+    try {
+      const data = await translatePromptSingle(options, null)
+      return { success: true, data }
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Network error',
+      }
+    }
+  }
+
+  // No tokens and requires auth
+  if (allTokens.length === 0 || !tokenProvider) {
+    return {
+      success: false,
+      error: `Please configure your ${provider} token first`,
+    }
+  }
+
+  const result = await runWithTokenRotation(
+    tokenProvider,
+    allTokens,
+    (t) => translatePromptSingle(options, t),
+    { allowAnonymous: false }
+  )
+
+  return result.success
+    ? { success: true, data: result.data }
+    : { success: false, error: result.error }
+}
+
+/** Custom model info */
+export interface CustomModelInfo {
+  id: string
+  name: string
+  owned_by?: string
+}
+
+/**
+ * Fetch available models from a custom OpenAI-compatible provider
+ */
+export async function fetchCustomModels(
+  baseUrl: string,
+  apiKey: string
+): Promise<ApiResponse<{ models: CustomModelInfo[] }>> {
   try {
-    const data = await apiRequest<TranslateResponse>(`${API_URL}/api/translate`, {
+    const data = await apiRequest<{ models: CustomModelInfo[] }>(`${API_URL}/api/custom-models`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ baseUrl, apiKey }),
     })
     return { success: true, data }
   } catch (err) {
     return {
       success: false,
-      error: err instanceof Error ? err.message : 'Network error',
+      error: err instanceof Error ? err.message : 'Failed to fetch models',
     }
   }
 }

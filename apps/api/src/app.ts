@@ -23,7 +23,6 @@ import {
   type OptimizeResponse,
   PROVIDER_CONFIGS,
   type ProviderType,
-  TRANSLATION_CONFIG,
   type TranslateRequest,
   type TranslateResponse,
   type VideoGenerateRequest,
@@ -168,6 +167,65 @@ export function createApp(config: AppConfig = {}) {
     return c.json({ providers })
   })
 
+  // Fetch models from custom OpenAI-compatible provider
+  app.post('/custom-models', async (c) => {
+    let body: { baseUrl: string; apiKey: string }
+    try {
+      body = await c.req.json()
+    } catch {
+      return sendError(c, Errors.invalidParams('body', 'Invalid JSON body'))
+    }
+
+    const { baseUrl, apiKey } = body
+
+    if (!baseUrl || !apiKey) {
+      return sendError(c, Errors.invalidParams('body', 'baseUrl and apiKey are required'))
+    }
+
+    // Normalize base URL to get /models endpoint
+    let url = baseUrl.trim()
+    if (url.endsWith('/')) {
+      url = url.slice(0, -1)
+    }
+    // Remove /chat/completions if present
+    if (url.endsWith('/chat/completions')) {
+      url = url.slice(0, -'/chat/completions'.length)
+    }
+    // Ensure /v1 is present
+    if (!url.endsWith('/v1')) {
+      url = `${url}/v1`
+    }
+    url = `${url}/models`
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error')
+        if (response.status === 401) {
+          return sendError(c, Errors.authInvalid('Custom Provider'))
+        }
+        return sendError(c, Errors.providerError('Custom Provider', `Failed to fetch models: ${errorText}`))
+      }
+
+      const data = (await response.json()) as { data?: Array<{ id: string; owned_by?: string }> }
+      const models = (data.data || []).map((m) => ({
+        id: m.id,
+        name: m.id,
+        owned_by: m.owned_by,
+      }))
+
+      return c.json({ models })
+    } catch (err) {
+      return sendError(c, Errors.providerError('Custom Provider', err instanceof Error ? err.message : 'Failed to fetch models'))
+    }
+  })
+
   // Prompt optimization endpoint
   app.post('/optimize', async (c) => {
     let body: OptimizeRequest
@@ -177,7 +235,7 @@ export function createApp(config: AppConfig = {}) {
       return sendError(c, Errors.invalidParams('body', 'Invalid JSON body'))
     }
 
-    const { prompt, provider = 'pollinations', lang = 'en', model, systemPrompt } = body
+    const { prompt, provider = 'pollinations', lang = 'en', model, systemPrompt, customConfig } = body
 
     // Validate prompt
     if (!prompt || typeof prompt !== 'string') {
@@ -195,12 +253,19 @@ export function createApp(config: AppConfig = {}) {
     // Get provider config
     const providerConfig = LLM_PROVIDER_CONFIGS[provider as LLMProviderType]
 
-    // Get auth token if required
+    // Get auth token if required (not needed for custom provider)
     let authToken: string | undefined
-    if (providerConfig.needsAuth && providerConfig.authHeader) {
+    if (provider !== 'custom' && providerConfig.needsAuth && providerConfig.authHeader) {
       authToken = c.req.header(providerConfig.authHeader)
       if (!authToken) {
         return sendError(c, Errors.authRequired(providerConfig.name))
+      }
+    }
+
+    // Validate custom config for custom provider
+    if (provider === 'custom') {
+      if (!customConfig?.baseUrl || !customConfig?.apiKey || !customConfig?.model) {
+        return sendError(c, Errors.invalidParams('customConfig', 'Custom provider requires baseUrl, apiKey, and model'))
       }
     }
 
@@ -210,13 +275,22 @@ export function createApp(config: AppConfig = {}) {
 
     try {
       const llmProvider = getLLMProvider(provider as LLMProviderType)
-      const result = await llmProvider.complete({
-        prompt,
-        systemPrompt: finalSystemPrompt,
-        model,
-        authToken,
-        maxTokens: 1000,
-      })
+
+      // Custom provider needs customConfig passed to complete()
+      const result = provider === 'custom'
+        ? await (llmProvider as unknown as { complete: (req: Parameters<typeof llmProvider.complete>[0], config?: typeof customConfig) => ReturnType<typeof llmProvider.complete> }).complete({
+            prompt,
+            systemPrompt: finalSystemPrompt,
+            model: customConfig?.model,
+            maxTokens: 1000,
+          }, customConfig)
+        : await llmProvider.complete({
+            prompt,
+            systemPrompt: finalSystemPrompt,
+            model,
+            authToken,
+            maxTokens: 1000,
+          })
 
       const response: OptimizeResponse = {
         optimized: result.content,
@@ -239,7 +313,7 @@ export function createApp(config: AppConfig = {}) {
       return sendError(c, Errors.invalidParams('body', 'Invalid JSON body'))
     }
 
-    const { prompt } = body
+    const { prompt, provider = 'pollinations', model, customConfig } = body
 
     // Validate prompt
     if (!prompt || typeof prompt !== 'string') {
@@ -249,41 +323,55 @@ export function createApp(config: AppConfig = {}) {
       return sendError(c, Errors.invalidPrompt('Prompt must be less than 2000 characters'))
     }
 
+    // Validate provider
+    if (!hasLLMProvider(provider)) {
+      return sendError(c, Errors.invalidProvider(provider))
+    }
+
+    // Get provider config
+    const providerConfig = LLM_PROVIDER_CONFIGS[provider as LLMProviderType]
+
+    // Get auth token if required (not needed for custom provider)
+    let authToken: string | undefined
+    if (provider !== 'custom' && providerConfig.needsAuth && providerConfig.authHeader) {
+      authToken = c.req.header(providerConfig.authHeader)
+      if (!authToken) {
+        return sendError(c, Errors.authRequired(providerConfig.name))
+      }
+    }
+
+    // Validate custom config for custom provider
+    if (provider === 'custom') {
+      if (!customConfig?.baseUrl || !customConfig?.apiKey || !customConfig?.model) {
+        return sendError(c, Errors.invalidParams('customConfig', 'Custom provider requires baseUrl, apiKey, and model'))
+      }
+    }
+
     try {
-      // Use Pollinations API with openai-fast model for translation
-      const response = await fetch(TRANSLATION_CONFIG.url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: TRANSLATION_CONFIG.model,
-          messages: [
-            { role: 'system', content: DEFAULT_TRANSLATE_SYSTEM_PROMPT },
-            { role: 'user', content: prompt },
-          ],
-          max_tokens: 1000,
-          temperature: 0.3, // Lower temperature for more accurate translation
-        }),
-      })
+      const llmProvider = getLLMProvider(provider as LLMProviderType)
 
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error')
-        throw Errors.providerError('Translation', errorText)
-      }
-
-      const data = (await response.json()) as {
-        choices?: Array<{ message?: { content?: string } }>
-      }
-      const translated = data.choices?.[0]?.message?.content?.trim()
-
-      if (!translated) {
-        throw Errors.providerError('Translation', 'Empty response from translation service')
-      }
+      // Custom provider needs customConfig passed to complete()
+      const result = provider === 'custom'
+        ? await (llmProvider as unknown as { complete: (req: Parameters<typeof llmProvider.complete>[0], config?: typeof customConfig) => ReturnType<typeof llmProvider.complete> }).complete({
+            prompt,
+            systemPrompt: DEFAULT_TRANSLATE_SYSTEM_PROMPT,
+            model: customConfig?.model,
+            maxTokens: 1000,
+            temperature: 0.3,
+          }, customConfig)
+        : await llmProvider.complete({
+            prompt,
+            systemPrompt: DEFAULT_TRANSLATE_SYSTEM_PROMPT,
+            model,
+            authToken,
+            maxTokens: 1000,
+            temperature: 0.3, // Lower temperature for more accurate translation
+          })
 
       const translateResponse: TranslateResponse = {
-        translated,
-        model: TRANSLATION_CONFIG.model,
+        translated: result.content,
+        provider: provider as LLMProviderType,
+        model: result.model,
       }
 
       return c.json(translateResponse)

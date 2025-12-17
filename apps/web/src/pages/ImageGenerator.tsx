@@ -43,8 +43,12 @@ export default function ImageGenerator() {
     setIsBlurred,
     setLLMProvider,
     setLLMModel,
+    setTranslateProvider,
+    setTranslateModel,
     setAutoTranslate,
     setCustomSystemPrompt,
+    setCustomOptimizeConfig,
+    setCustomTranslateConfig,
     saveToken,
     handleRatioSelect,
     handleUhdToggle,
@@ -129,8 +133,12 @@ export default function ImageGenerator() {
         llmSettings={llmSettings}
         setLLMProvider={setLLMProvider}
         setLLMModel={setLLMModel}
+        setTranslateProvider={setTranslateProvider}
+        setTranslateModel={setTranslateModel}
         setAutoTranslate={setAutoTranslate}
         setCustomSystemPrompt={setCustomSystemPrompt}
+        setCustomOptimizeConfig={setCustomOptimizeConfig}
+        setCustomTranslateConfig={setCustomTranslateConfig}
       />
     </div>
   )

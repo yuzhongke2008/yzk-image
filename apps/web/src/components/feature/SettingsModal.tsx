@@ -1,6 +1,6 @@
 import { DEFAULT_OPTIMIZE_SYSTEM_PROMPT, type ModelConfig } from '@z-image/shared'
-import { RotateCcw, Settings, Sparkles, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { Languages, Loader2, RefreshCw, RotateCcw, Settings, Sparkles, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { type CustomModelInfo, fetchCustomModels } from '@/lib/api'
 import {
   getLLMModels,
   LLM_PROVIDER_OPTIONS,
@@ -27,7 +28,7 @@ import { getTokenStats, parseTokens } from '@/lib/tokenRotation'
 
 const SETTINGS_TAB_KEY = 'zenith-settings-tab'
 
-type TabType = 'api' | 'llm'
+type TabType = 'api' | 'optimize' | 'translate'
 
 interface SettingsModalProps {
   isOpen: boolean
@@ -42,8 +43,12 @@ interface SettingsModalProps {
   llmSettings: LLMSettings
   setLLMProvider: (provider: LLMProviderType) => void
   setLLMModel: (model: string) => void
+  setTranslateProvider: (provider: LLMProviderType) => void
+  setTranslateModel: (model: string) => void
   setAutoTranslate: (enabled: boolean) => void
   setCustomSystemPrompt: (prompt: string) => void
+  setCustomOptimizeConfig: (config: Partial<{ baseUrl: string; apiKey: string; model: string }>) => void
+  setCustomTranslateConfig: (config: Partial<{ baseUrl: string; apiKey: string; model: string }>) => void
 }
 
 export function SettingsModal({
@@ -59,8 +64,12 @@ export function SettingsModal({
   llmSettings,
   setLLMProvider,
   setLLMModel,
+  setTranslateProvider,
+  setTranslateModel,
   setAutoTranslate,
   setCustomSystemPrompt,
+  setCustomOptimizeConfig,
+  setCustomTranslateConfig,
 }: SettingsModalProps) {
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<TabType>(() => {
@@ -68,10 +77,89 @@ export function SettingsModal({
     return (saved as TabType) || 'api'
   })
 
+  // Custom models state for optimize and translate
+  const [optimizeCustomModels, setOptimizeCustomModels] = useState<CustomModelInfo[]>([])
+  const [translateCustomModels, setTranslateCustomModels] = useState<CustomModelInfo[]>([])
+  const [isLoadingOptimizeModels, setIsLoadingOptimizeModels] = useState(false)
+  const [isLoadingTranslateModels, setIsLoadingTranslateModels] = useState(false)
+  const [optimizeModelsError, setOptimizeModelsError] = useState<string | null>(null)
+  const [translateModelsError, setTranslateModelsError] = useState<string | null>(null)
+
   // Persist tab selection
   useEffect(() => {
     localStorage.setItem(SETTINGS_TAB_KEY, activeTab)
   }, [activeTab])
+
+  // Fetch custom models for optimize provider
+  const fetchOptimizeModels = useCallback(async () => {
+    const { baseUrl, apiKey } = llmSettings.customOptimizeConfig
+    if (!baseUrl || !apiKey) {
+      setOptimizeCustomModels([])
+      return
+    }
+
+    setIsLoadingOptimizeModels(true)
+    setOptimizeModelsError(null)
+
+    const result = await fetchCustomModels(baseUrl, apiKey)
+    if (result.success) {
+      setOptimizeCustomModels(result.data.models)
+      // Auto-select first model if none selected
+      if (result.data.models.length > 0 && !llmSettings.customOptimizeConfig.model) {
+        setCustomOptimizeConfig({ model: result.data.models[0].id })
+      }
+    } else {
+      setOptimizeModelsError(result.error)
+      setOptimizeCustomModels([])
+    }
+
+    setIsLoadingOptimizeModels(false)
+  }, [llmSettings.customOptimizeConfig, setCustomOptimizeConfig])
+
+  // Fetch custom models for translate provider
+  const fetchTranslateModels = useCallback(async () => {
+    const { baseUrl, apiKey } = llmSettings.customTranslateConfig
+    if (!baseUrl || !apiKey) {
+      setTranslateCustomModels([])
+      return
+    }
+
+    setIsLoadingTranslateModels(true)
+    setTranslateModelsError(null)
+
+    const result = await fetchCustomModels(baseUrl, apiKey)
+    if (result.success) {
+      setTranslateCustomModels(result.data.models)
+      // Auto-select first model if none selected
+      if (result.data.models.length > 0 && !llmSettings.customTranslateConfig.model) {
+        setCustomTranslateConfig({ model: result.data.models[0].id })
+      }
+    } else {
+      setTranslateModelsError(result.error)
+      setTranslateCustomModels([])
+    }
+
+    setIsLoadingTranslateModels(false)
+  }, [llmSettings.customTranslateConfig, setCustomTranslateConfig])
+
+  // Auto-fetch models when baseUrl and apiKey are filled
+  useEffect(() => {
+    if (llmSettings.llmProvider === 'custom') {
+      const { baseUrl, apiKey } = llmSettings.customOptimizeConfig
+      if (baseUrl && apiKey && optimizeCustomModels.length === 0 && !isLoadingOptimizeModels) {
+        fetchOptimizeModels()
+      }
+    }
+  }, [llmSettings.llmProvider, llmSettings.customOptimizeConfig, optimizeCustomModels.length, isLoadingOptimizeModels, fetchOptimizeModels])
+
+  useEffect(() => {
+    if (llmSettings.translateProvider === 'custom') {
+      const { baseUrl, apiKey } = llmSettings.customTranslateConfig
+      if (baseUrl && apiKey && translateCustomModels.length === 0 && !isLoadingTranslateModels) {
+        fetchTranslateModels()
+      }
+    }
+  }, [llmSettings.translateProvider, llmSettings.customTranslateConfig, translateCustomModels.length, isLoadingTranslateModels, fetchTranslateModels])
 
   // API Config computed values
   const providerConfig = PROVIDER_CONFIGS[provider]
@@ -81,6 +169,7 @@ export function SettingsModal({
 
   // LLM Config computed values
   const llmModels = getLLMModels(llmSettings.llmProvider)
+  const translateModels = getLLMModels(llmSettings.translateProvider)
   const hasCustomPrompt = (llmSettings.customSystemPrompt ?? '').trim() !== ''
 
   if (!isOpen) return null
@@ -105,27 +194,39 @@ export function SettingsModal({
           <button
             type="button"
             onClick={() => setActiveTab('api')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-medium transition-colors ${
               activeTab === 'api'
                 ? 'text-orange-400 border-b-2 border-orange-400 bg-zinc-800/50'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/30'
             }`}
           >
-            <Settings className="w-4 h-4" />
+            <Settings className="w-3.5 h-3.5" />
             <span>{t('apiConfig.title')}</span>
-            {isConfigured && <span className="w-2 h-2 bg-green-500 rounded-full" />}
+            {isConfigured && <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />}
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('llm')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'llm'
+            onClick={() => setActiveTab('optimize')}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-medium transition-colors ${
+              activeTab === 'optimize'
                 ? 'text-orange-400 border-b-2 border-orange-400 bg-zinc-800/50'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/30'
             }`}
           >
-            <Sparkles className="w-4 h-4" />
-            <span>LLM</span>
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Optimize</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('translate')}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 text-xs font-medium transition-colors ${
+              activeTab === 'translate'
+                ? 'text-orange-400 border-b-2 border-orange-400 bg-zinc-800/50'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/30'
+            }`}
+          >
+            <Languages className="w-3.5 h-3.5" />
+            <span>Translate</span>
           </button>
         </div>
 
@@ -211,11 +312,11 @@ export function SettingsModal({
             </div>
           )}
 
-          {activeTab === 'llm' && (
+          {activeTab === 'optimize' && (
             <div className="space-y-4">
-              {/* LLM Provider Selection */}
+              {/* Optimize Provider Selection */}
               <div>
-                <Label className="text-zinc-400 text-xs">LLM Provider</Label>
+                <Label className="text-zinc-400 text-xs">Provider</Label>
                 <Select
                   value={llmSettings.llmProvider}
                   onValueChange={(v) => setLLMProvider(v as LLMProviderType)}
@@ -236,40 +337,106 @@ export function SettingsModal({
                 </Select>
               </div>
 
-              {/* LLM Model Selection */}
-              <div>
-                <Label className="text-zinc-400 text-xs">LLM Model</Label>
-                <Select value={llmSettings.llmModel} onValueChange={setLLMModel}>
-                  <SelectTrigger className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-zinc-900/70 backdrop-blur-md border-zinc-700 text-white">
-                    {llmModels.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.name}
-                        {m.description && (
-                          <span className="ml-2 text-xs text-zinc-500">- {m.description}</span>
-                        )}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Auto-Translate Toggle */}
-              <div className="flex items-center justify-between">
+              {/* Custom Provider Config */}
+              {llmSettings.llmProvider === 'custom' ? (
+                <>
+                  <div>
+                    <Label className="text-zinc-400 text-xs">API Base URL</Label>
+                    <Input
+                      type="text"
+                      placeholder="https://api.openai.com/v1"
+                      value={llmSettings.customOptimizeConfig.baseUrl}
+                      onChange={(e) => {
+                        setCustomOptimizeConfig({ baseUrl: e.target.value })
+                        setOptimizeCustomModels([]) // Clear models when URL changes
+                      }}
+                      className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-zinc-400 text-xs">API Key</Label>
+                    <Input
+                      type="password"
+                      placeholder="sk-..."
+                      value={llmSettings.customOptimizeConfig.apiKey}
+                      onChange={(e) => {
+                        setCustomOptimizeConfig({ apiKey: e.target.value })
+                        setOptimizeCustomModels([]) // Clear models when key changes
+                      }}
+                      className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-zinc-400 text-xs">Model</Label>
+                      {llmSettings.customOptimizeConfig.baseUrl && llmSettings.customOptimizeConfig.apiKey && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={fetchOptimizeModels}
+                          disabled={isLoadingOptimizeModels}
+                          className="h-5 px-1.5 text-zinc-500 hover:text-zinc-300"
+                        >
+                          {isLoadingOptimizeModels ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-3 h-3" />
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                    {optimizeCustomModels.length > 0 ? (
+                      <Select
+                        value={llmSettings.customOptimizeConfig.model}
+                        onValueChange={(v) => setCustomOptimizeConfig({ model: v })}
+                      >
+                        <SelectTrigger className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100">
+                          <SelectValue placeholder="Select a model" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-900/70 backdrop-blur-md border-zinc-700 text-white max-h-60">
+                          {optimizeCustomModels.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        type="text"
+                        placeholder={isLoadingOptimizeModels ? 'Loading models...' : 'gpt-4o-mini'}
+                        value={llmSettings.customOptimizeConfig.model}
+                        onChange={(e) => setCustomOptimizeConfig({ model: e.target.value })}
+                        className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 text-xs"
+                      />
+                    )}
+                    {optimizeModelsError && (
+                      <p className="text-red-400 text-[10px] mt-1">{optimizeModelsError}</p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                /* Standard Model Selection */
                 <div>
-                  <Label className="text-zinc-300 text-sm">Auto-Translate</Label>
-                  <p className="text-zinc-500 text-xs mt-0.5">
-                    Automatically translate Chinese prompts to English
-                  </p>
+                  <Label className="text-zinc-400 text-xs">Model</Label>
+                  <Select value={llmSettings.llmModel} onValueChange={setLLMModel}>
+                    <SelectTrigger className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900/70 backdrop-blur-md border-zinc-700 text-white">
+                      {llmModels.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.name}
+                          {m.description && (
+                            <span className="ml-2 text-xs text-zinc-500">- {m.description}</span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Switch
-                  checked={llmSettings.autoTranslate}
-                  onCheckedChange={setAutoTranslate}
-                  className="data-[state=unchecked]:[&>span]:bg-zinc-500 data-[state=checked]:[&>span]:bg-blue-500"
-                />
-              </div>
+              )}
 
               {/* Custom System Prompt */}
               <div>
@@ -298,11 +465,153 @@ export function SettingsModal({
                   placeholder={`${DEFAULT_OPTIMIZE_SYSTEM_PROMPT.slice(0, 200)}...`}
                   className="bg-zinc-950 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 resize-none text-xs"
                 />
-                <p className="text-zinc-600 text-xs mt-1">
-                  Leave empty to use the default system prompt. The language instruction will be
-                  appended automatically.
+                <p className="text-zinc-600 text-[10px] mt-1">
+                  Leave empty to use the default system prompt.
                 </p>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'translate' && (
+            <div className="space-y-4">
+              {/* Auto-Translate Toggle */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-zinc-300 text-sm">Auto-Translate</Label>
+                  <p className="text-zinc-500 text-xs mt-0.5">
+                    Automatically translate Chinese prompts to English
+                  </p>
+                </div>
+                <Switch
+                  checked={llmSettings.autoTranslate}
+                  onCheckedChange={setAutoTranslate}
+                  className="data-[state=unchecked]:[&>span]:bg-zinc-500 data-[state=checked]:[&>span]:bg-blue-500"
+                />
+              </div>
+
+              {/* Translate Provider Selection */}
+              <div>
+                <Label className="text-zinc-400 text-xs">Provider</Label>
+                <Select
+                  value={llmSettings.translateProvider}
+                  onValueChange={(v) => setTranslateProvider(v as LLMProviderType)}
+                >
+                  <SelectTrigger className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-zinc-900/70 backdrop-blur-md border-zinc-700 text-white">
+                    {LLM_PROVIDER_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                        {!opt.needsAuth && (
+                          <span className="ml-2 text-xs text-green-500">(Free)</span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Custom Provider Config */}
+              {llmSettings.translateProvider === 'custom' ? (
+                <>
+                  <div>
+                    <Label className="text-zinc-400 text-xs">API Base URL</Label>
+                    <Input
+                      type="text"
+                      placeholder="https://api.openai.com/v1"
+                      value={llmSettings.customTranslateConfig.baseUrl}
+                      onChange={(e) => {
+                        setCustomTranslateConfig({ baseUrl: e.target.value })
+                        setTranslateCustomModels([]) // Clear models when URL changes
+                      }}
+                      className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-zinc-400 text-xs">API Key</Label>
+                    <Input
+                      type="password"
+                      placeholder="sk-..."
+                      value={llmSettings.customTranslateConfig.apiKey}
+                      onChange={(e) => {
+                        setCustomTranslateConfig({ apiKey: e.target.value })
+                        setTranslateCustomModels([]) // Clear models when key changes
+                      }}
+                      className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-zinc-400 text-xs">Model</Label>
+                      {llmSettings.customTranslateConfig.baseUrl && llmSettings.customTranslateConfig.apiKey && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={fetchTranslateModels}
+                          disabled={isLoadingTranslateModels}
+                          className="h-5 px-1.5 text-zinc-500 hover:text-zinc-300"
+                        >
+                          {isLoadingTranslateModels ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-3 h-3" />
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                    {translateCustomModels.length > 0 ? (
+                      <Select
+                        value={llmSettings.customTranslateConfig.model}
+                        onValueChange={(v) => setCustomTranslateConfig({ model: v })}
+                      >
+                        <SelectTrigger className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100">
+                          <SelectValue placeholder="Select a model" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-900/70 backdrop-blur-md border-zinc-700 text-white max-h-60">
+                          {translateCustomModels.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        type="text"
+                        placeholder={isLoadingTranslateModels ? 'Loading models...' : 'gpt-4o-mini'}
+                        value={llmSettings.customTranslateConfig.model}
+                        onChange={(e) => setCustomTranslateConfig({ model: e.target.value })}
+                        className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100 placeholder:text-zinc-600 text-xs"
+                      />
+                    )}
+                    {translateModelsError && (
+                      <p className="text-red-400 text-[10px] mt-1">{translateModelsError}</p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                /* Standard Model Selection */
+                <div>
+                  <Label className="text-zinc-400 text-xs">Model</Label>
+                  <Select value={llmSettings.translateModel} onValueChange={setTranslateModel}>
+                    <SelectTrigger className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900/70 backdrop-blur-md border-zinc-700 text-white">
+                      {translateModels.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.name}
+                          {m.description && (
+                            <span className="ml-2 text-xs text-zinc-500">- {m.description}</span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           )}
         </div>
