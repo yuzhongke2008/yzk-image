@@ -180,6 +180,46 @@ X-MS-Token: your-modelscope-token     # ModelScope (optional)
 | `seed`                | number | No       | random          | Random seed for reproducibility     |
 | `guidanceScale`       | number | No       | -               | Guidance scale, controls prompt influence on output |
 
+## `POST /v1/images/generations` (OpenAI-compatible)
+
+OpenAI-compatible Images API endpoint (defaults to HuggingFace).
+
+**Headers:**
+
+```
+Content-Type: application/json
+Authorization: Bearer <token>        # optional
+```
+
+**Auth token formats:**
+- No token: uses HuggingFace public access (may be rate limited)
+- `hf_...`: HuggingFace token
+- `gitee:...`: Gitee AI API key
+- `ms:...`: ModelScope token
+
+**Request Body (subset):**
+
+| Field | Type | Required | Default | Notes |
+|------|------|----------|---------|------|
+| `prompt` | string | Yes | - | Prompt text |
+| `model` | string | No | `z-image-turbo` | Model mapping below |
+| `size` | string | No | `1024x1024` | e.g. `1024x1024`, `1792x1024`, `1024x1792` |
+| `n` | number | No | `1` | Only supports `1` |
+| `response_format` | string | No | `url` | Only supports `url` |
+| `negative_prompt` | string | No | - | Negative prompt |
+| `steps` | number | No | - | Steps (1-50) |
+| `seed` | number | No | - | Seed |
+| `guidance_scale` | number | No | - | Guidance scale |
+
+**Model mapping:**
+- No prefix → HuggingFace (`z-image-turbo`, `qwen-image-fast`, `ovis-image`, `flux-1-schnell`)
+- `gitee/...` → Gitee provider (e.g. `gitee/z-image-turbo`, `gitee/qwen-image`)
+- `ms/...` → ModelScope provider (e.g. `ms/flux-2`)
+
+## `GET /v1/models` (OpenAI-compatible)
+
+Returns the OpenAI-compatible model list for `/v1` endpoints.
+
 ## Providers
 
 > For complete provider and model details, see **[Providers & Models](./PROVIDERS.md)**.

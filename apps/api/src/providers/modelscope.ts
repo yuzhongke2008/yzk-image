@@ -5,8 +5,14 @@
 import { Errors } from '@z-image/shared'
 import type { ImageProvider, ProviderGenerateRequest, ProviderGenerateResult } from './types'
 
-interface ModelScopeResponse {
-  images?: Array<{ url?: string }>
+interface ModelScopeTaskResponse {
+  task_id?: string
+}
+
+interface ModelScopeTaskStatusResponse {
+  task_status?: 'PENDING' | 'RUNNING' | 'SUCCEED' | 'FAILED'
+  output_images?: string[]
+  error_message?: string
 }
 
 interface ModelScopeErrorResponse {
@@ -62,6 +68,8 @@ export class ModelScopeProvider implements ImageProvider {
   readonly name = 'ModelScope'
 
   private readonly baseUrl = 'https://api-inference.modelscope.cn/v1'
+  private readonly maxPollAttempts = 35
+  private readonly pollIntervalMs = 3000
 
   async generate(request: ProviderGenerateRequest): Promise<ProviderGenerateResult> {
     if (!request.authToken) {
@@ -75,23 +83,40 @@ export class ModelScopeProvider implements ImageProvider {
     }
 
     const sizeString = `${request.width}x${request.height}`
+    const seed = request.seed ?? Math.floor(Math.random() * 2147483647)
     const body: Record<string, unknown> = {
       prompt: request.prompt,
       model: request.model || 'Tongyi-MAI/Z-Image-Turbo',
       size: sizeString,
-      seed: request.seed ?? Math.floor(Math.random() * 2147483647),
+      seed,
       steps: request.steps ?? 9,
+    }
+
+    if (request.negativePrompt) {
+      body.negative_prompt = request.negativePrompt
     }
 
     if (request.guidanceScale !== undefined) {
       body.guidance = request.guidanceScale
     }
 
+    if (request.loras) {
+      body.loras = request.loras
+    }
+
+    const taskId = await this.submitTask(token, body)
+    const imageUrl = await this.pollForResult(token, taskId)
+
+    return { url: imageUrl, seed }
+  }
+
+  private async submitTask(token: string, body: Record<string, unknown>): Promise<string> {
     const response = await fetch(`${this.baseUrl}/images/generations`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
+        'X-ModelScope-Async-Mode': 'true',
       },
       body: JSON.stringify(body),
     })
@@ -101,14 +126,54 @@ export class ModelScopeProvider implements ImageProvider {
       throw parseModelScopeError(response.status, errData)
     }
 
-    const data = (await response.json()) as ModelScopeResponse
-    const imageUrl = data.images?.[0]?.url
-
-    if (!imageUrl) {
-      throw Errors.generationFailed('ModelScope', 'No image returned')
+    const data = (await response.json()) as ModelScopeTaskResponse
+    const taskId = data.task_id
+    if (!taskId) {
+      throw Errors.generationFailed('ModelScope', 'No task_id returned')
     }
 
-    return { url: imageUrl, seed: body.seed as number }
+    return taskId
+  }
+
+  private async pollForResult(token: string, taskId: string): Promise<string> {
+    for (let attempt = 0; attempt < this.maxPollAttempts; attempt++) {
+      const response = await fetch(`${this.baseUrl}/tasks/${taskId}`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'X-ModelScope-Task-Type': 'image_generation',
+        },
+      })
+
+      if (!response.ok) {
+        const errData = (await response.json().catch(() => ({}))) as ModelScopeErrorResponse
+        throw parseModelScopeError(response.status, errData)
+      }
+
+      const data = (await response.json()) as ModelScopeTaskStatusResponse
+      const status = data.task_status
+
+      if (status === 'SUCCEED') {
+        const imageUrl = data.output_images?.[0]
+        if (!imageUrl) {
+          throw Errors.generationFailed('ModelScope', 'No image in result')
+        }
+        return imageUrl
+      }
+
+      if (status === 'FAILED') {
+        throw Errors.generationFailed('ModelScope', data.error_message || 'Task failed')
+      }
+
+      await this.delay(this.pollIntervalMs)
+    }
+
+    throw Errors.timeout('ModelScope')
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms))
   }
 }
 

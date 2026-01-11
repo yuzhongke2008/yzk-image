@@ -107,7 +107,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     name: 'Z-Image Turbo',
     provider: 'modelscope',
     features: {
-      negativePrompt: false,
+      negativePrompt: true,
       steps: { min: 1, max: 20, default: 9 },
       seed: true,
     },
@@ -117,7 +117,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     name: 'FLUX.2',
     provider: 'modelscope',
     features: {
-      negativePrompt: false,
+      negativePrompt: true,
       steps: { min: 1, max: 50, default: 24 },
       guidanceScale: { min: 1, max: 10, default: 3.5 },
       seed: true,
@@ -128,7 +128,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     name: 'FLUX.1 Krea',
     provider: 'modelscope',
     features: {
-      negativePrompt: false,
+      negativePrompt: true,
       steps: { min: 1, max: 50, default: 24 },
       guidanceScale: { min: 1, max: 20, default: 3.5 },
       seed: true,
@@ -139,7 +139,7 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     name: 'FLUX.1',
     provider: 'modelscope',
     features: {
-      negativePrompt: false,
+      negativePrompt: true,
       steps: { min: 1, max: 50, default: 24 },
       guidanceScale: { min: 1, max: 20, default: 3.5 },
       seed: true,

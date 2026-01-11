@@ -45,6 +45,7 @@ import {
   sendError,
   timeout,
 } from './middleware'
+import { registerOpenAIRoutes } from './openai/routes'
 import { getProvider, hasProvider } from './providers'
 import { createVideoTask, getVideoTaskStatus } from './providers/gitee'
 import { callGradioApi, formatDimensions, formatDuration } from './utils'
@@ -53,19 +54,13 @@ export interface AppConfig {
   corsOrigins?: string[]
 }
 
-export function createApp(config: AppConfig = {}) {
-  const app = new Hono().basePath('/api')
-
-  // Default CORS origins for development
-  const defaultOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000']
-  const origins = config.corsOrigins || defaultOrigins
-
-  // Pre-create CORS middleware instance (optimization)
-  const corsMiddleware = cors({
+function createCorsMiddleware(origins: string[]) {
+  return cors({
     origin: origins,
     allowMethods: ['GET', 'POST', 'OPTIONS'],
     allowHeaders: [
       'Content-Type',
+      'Authorization',
       'X-API-Key',
       'X-HF-Token',
       'X-MS-Token',
@@ -73,6 +68,17 @@ export function createApp(config: AppConfig = {}) {
       'X-Request-ID',
     ],
   })
+}
+
+function createApiApp(config: AppConfig = {}) {
+  const app = new Hono().basePath('/api')
+
+  // Default CORS origins for development
+  const defaultOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000']
+  const origins = config.corsOrigins || defaultOrigins
+
+  // Pre-create CORS middleware instance (optimization)
+  const corsMiddleware = createCorsMiddleware(origins)
 
   // Global error handlers
   app.onError(errorHandler)
@@ -485,6 +491,7 @@ export function createApp(config: AppConfig = {}) {
         model: body.model,
         prompt: body.prompt,
         negativePrompt: body.negativePrompt || body.negative_prompt,
+        loras: body.loras,
         width,
         height,
         steps,
@@ -763,6 +770,39 @@ export function createApp(config: AppConfig = {}) {
     }
   })
 
+  return app
+}
+
+function createOpenAIApp(config: AppConfig = {}) {
+  const app = new Hono().basePath('/v1')
+
+  const defaultOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000']
+  const origins = config.corsOrigins || defaultOrigins
+  const corsMiddleware = createCorsMiddleware(origins)
+
+  app.onError(errorHandler)
+  app.notFound(notFoundHandler)
+
+  app.use('/*', requestId)
+  app.use('/*', corsMiddleware)
+  app.use('/*', securityHeaders)
+  app.use('/*', requestLogger)
+
+  app.use('/*', timeout(120000))
+  app.use('/*', bodyLimit(50 * 1024))
+  app.use('/*', rateLimitPresets.generate)
+
+  registerOpenAIRoutes(app)
+
+  return app
+}
+
+export function createApp(config: AppConfig = {}) {
+  const app = new Hono()
+  app.onError(errorHandler)
+  app.notFound(notFoundHandler)
+  app.route('/', createOpenAIApp(config))
+  app.route('/', createApiApp(config))
   return app
 }
 

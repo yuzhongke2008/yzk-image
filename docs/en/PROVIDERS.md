@@ -82,10 +82,10 @@ China-based AI model hosting platform by Alibaba.
 
 | Model ID | Display Name | Negative Prompt | Steps | Guidance Scale |
 |----------|--------------|-----------------|-------|----------------|
-| `Tongyi-MAI/Z-Image-Turbo` | Z-Image Turbo | No | 1-20 (default: 9) | - |
-| `black-forest-labs/FLUX.2-dev` | FLUX.2 | No | 1-50 (default: 24) | 1-10 (default: 3.5) |
-| `black-forest-labs/FLUX.1-Krea-dev` | FLUX.1 Krea | No | 1-50 (default: 24) | 1-20 (default: 3.5) |
-| `MusePublic/489_ckpt_FLUX_1` | FLUX.1 | No | 1-50 (default: 24) | 1-20 (default: 3.5) |
+| `Tongyi-MAI/Z-Image-Turbo` | Z-Image Turbo | Yes | 1-20 (default: 9) | - |
+| `black-forest-labs/FLUX.2-dev` | FLUX.2 | Yes | 1-50 (default: 24) | 1-10 (default: 3.5) |
+| `black-forest-labs/FLUX.1-Krea-dev` | FLUX.1 Krea | Yes | 1-50 (default: 24) | 1-20 (default: 3.5) |
+| `MusePublic/489_ckpt_FLUX_1` | FLUX.1 | Yes | 1-50 (default: 24) | 1-20 (default: 3.5) |
 
 ---
 
@@ -97,7 +97,7 @@ China-based AI model hosting platform by Alibaba.
 |----------|----------------------------|
 | Gitee AI | `z-image-turbo`, `Qwen-Image` |
 | HuggingFace | None |
-| ModelScope | None |
+| ModelScope | `Tongyi-MAI/Z-Image-Turbo`, `FLUX.2-dev`, `FLUX.1-Krea-dev`, `FLUX.1` |
 
 ### Guidance Scale Support
 

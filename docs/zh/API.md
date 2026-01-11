@@ -180,6 +180,46 @@ X-MS-Token: your-modelscope-token     # ModelScope (可选)
 | `seed`                | number | 否   | 随机            | 随机种子，用于复现结果              |
 | `guidanceScale`       | number | 否   | -               | 引导比例，控制提示词对生成结果的影响程度 |
 
+## `POST /v1/images/generations`（OpenAI 兼容）
+
+OpenAI 兼容的 Images 接口（默认使用 HuggingFace）。
+
+**请求头：**
+
+```
+Content-Type: application/json
+Authorization: Bearer <token>        # 可选
+```
+
+**Token 格式：**
+- 不提供 token：使用 HuggingFace 公共访问（可能会限流）
+- `hf_...`：HuggingFace Token
+- `gitee:...`：Gitee AI API Key
+- `ms:...`：ModelScope Token
+
+**请求体（字段子集）：**
+
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| `prompt` | string | 是 | - | 提示词 |
+| `model` | string | 否 | `z-image-turbo` | 模型映射见下 |
+| `size` | string | 否 | `1024x1024` | 如 `1024x1024`, `1792x1024`, `1024x1792` |
+| `n` | number | 否 | `1` | 仅支持 `1` |
+| `response_format` | string | 否 | `url` | 仅支持 `url` |
+| `negative_prompt` | string | 否 | - | 负面提示词 |
+| `steps` | number | 否 | - | 步数 (1-50) |
+| `seed` | number | 否 | - | 种子 |
+| `guidance_scale` | number | 否 | - | 引导比例 |
+
+**模型映射：**
+- 无前缀 → HuggingFace（`z-image-turbo`, `qwen-image-fast`, `ovis-image`, `flux-1-schnell`）
+- `gitee/...` → Gitee provider（如 `gitee/z-image-turbo`, `gitee/qwen-image`）
+- `ms/...` → ModelScope provider（如 `ms/flux-2`）
+
+## `GET /v1/models`（OpenAI 兼容）
+
+返回 `/v1` 接口使用的 OpenAI 兼容模型列表。
+
 ## Providers
 
 > 完整的供应商和模型详情，请参阅 **[供应商与模型](./PROVIDERS.md)**。

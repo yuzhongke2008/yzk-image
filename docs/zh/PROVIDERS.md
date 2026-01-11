@@ -82,10 +82,10 @@
 
 | 模型 ID | 显示名称 | 负面提示词 | 步数范围 | 引导比例 |
 |---------|----------|------------|----------|----------|
-| `Tongyi-MAI/Z-Image-Turbo` | Z-Image Turbo | 不支持 | 1-20 (默认: 9) | - |
-| `black-forest-labs/FLUX.2-dev` | FLUX.2 | 不支持 | 1-50 (默认: 24) | 1-10 (默认: 3.5) |
-| `black-forest-labs/FLUX.1-Krea-dev` | FLUX.1 Krea | 不支持 | 1-50 (默认: 24) | 1-20 (默认: 3.5) |
-| `MusePublic/489_ckpt_FLUX_1` | FLUX.1 | 不支持 | 1-50 (默认: 24) | 1-20 (默认: 3.5) |
+| `Tongyi-MAI/Z-Image-Turbo` | Z-Image Turbo | 支持 | 1-20 (默认: 9) | - |
+| `black-forest-labs/FLUX.2-dev` | FLUX.2 | 支持 | 1-50 (默认: 24) | 1-10 (默认: 3.5) |
+| `black-forest-labs/FLUX.1-Krea-dev` | FLUX.1 Krea | 支持 | 1-50 (默认: 24) | 1-20 (默认: 3.5) |
+| `MusePublic/489_ckpt_FLUX_1` | FLUX.1 | 支持 | 1-50 (默认: 24) | 1-20 (默认: 3.5) |
 
 ---
 
@@ -97,7 +97,7 @@
 |--------|---------------------|
 | Gitee AI | `z-image-turbo`, `Qwen-Image` |
 | HuggingFace | 无 |
-| ModelScope | 无 |
+| ModelScope | `Tongyi-MAI/Z-Image-Turbo`, `FLUX.2-dev`, `FLUX.1-Krea-dev`, `FLUX.1` |
 
 ### 引导比例支持
 

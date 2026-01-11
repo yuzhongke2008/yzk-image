@@ -14,6 +14,8 @@ export interface GenerateRequest {
   prompt: string
   /** Negative prompt */
   negativePrompt?: string
+  /** LoRA config (single or multi) */
+  loras?: string | Record<string, number>
   /** Image width */
   width: number
   /** Image height */
