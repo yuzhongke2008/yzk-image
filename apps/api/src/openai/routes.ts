@@ -2,36 +2,10 @@ import { Errors, getModelsByProvider, PROVIDER_CONFIGS } from '@z-image/shared'
 import type { Hono } from 'hono'
 import { sendError } from '../middleware'
 import { getProvider } from '../providers'
+import { getOrigin, toProxyUrl } from '../utils'
 import { convertRequest, convertResponse, parseBearerToken } from './adapter'
 import { resolveModel } from './model-resolver'
 import type { OpenAIImageRequest, OpenAIModelsListResponse } from './types'
-
-function getOrigin(c: Parameters<Parameters<Hono['post']>[1]>[0]): string {
-  try {
-    return new URL(c.req.url).origin
-  } catch {
-    return ''
-  }
-}
-
-function toProxyUrl(origin: string, url: string): string {
-  if (!origin) return url
-
-  try {
-    const parsed = new URL(url)
-    if (parsed.hostname.endsWith('.hf.space') && parsed.pathname.startsWith('/gradio_api/file=')) {
-      return `${origin}/api/proxy-image?url=${encodeURIComponent(url)}`
-    }
-  } catch {
-    // ignore invalid URL, fall back to raw string checks
-  }
-
-  if (url.includes('.hf.space/gradio_api/file=')) {
-    return `${origin}/api/proxy-image?url=${encodeURIComponent(url)}`
-  }
-
-  return url
-}
 
 function listModels(): OpenAIModelsListResponse {
   const created = 1700000000
