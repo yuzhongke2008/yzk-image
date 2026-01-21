@@ -4,12 +4,12 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  HISTORY_STORAGE_KEY,
-  HISTORY_TTL_MS,
   clearAllHistory,
   clearExpiredHistory,
   getAllHistoryIncludingExpired,
   getHistory,
+  HISTORY_STORAGE_KEY,
+  HISTORY_TTL_MS,
   saveToHistory,
 } from '../historyStore'
 

@@ -6,10 +6,10 @@ import { HistoryItem } from '@/components/feature/HistoryItem'
 import {
   clearAllHistory,
   clearExpiredHistory,
+  deleteHistoryItem,
   getHistory,
   getHistoryStats,
   type ImageHistoryItem,
-  deleteHistoryItem,
 } from '@/lib/historyStore'
 
 interface ImageHistoryProps {
