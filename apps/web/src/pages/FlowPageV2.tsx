@@ -107,6 +107,7 @@ function FlowCanvas() {
 
   // Settings state
   const [tokens, setTokens] = useState<Record<ProviderType, string>>({
+    a4f: '',
     gitee: '',
     huggingface: '',
     modelscope: '',

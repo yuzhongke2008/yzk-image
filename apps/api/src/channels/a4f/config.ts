@@ -8,8 +8,10 @@ export const a4fConfig: ChannelConfig = {
     llm: '/chat/completions',
   },
   imageModels: [
-    { id: 'gpt-image-1', name: 'GPT Image 1' },
-    { id: 'dall-e-3', name: 'DALL-E 3' },
+    { id: 'provider-4/imagen-3.5', name: 'Imagen 3.5 (provider-4)' },
+    { id: 'provider-4/imagen-4', name: 'Imagen 4 (provider-4)' },
+    { id: 'provider-8/imagen-3', name: 'Imagen 3 (provider-8)' },
+    { id: 'provider-4/flux-schnell', name: 'FLUX Schnell (provider-4)' },
+    { id: 'provider-8/z-image', name: 'Z-Image (provider-8)' },
   ],
-  llmModels: [{ id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' }],
 }

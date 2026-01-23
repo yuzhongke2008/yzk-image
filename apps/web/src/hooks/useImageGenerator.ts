@@ -48,6 +48,7 @@ type ImageDetailsWithMeta = ImageDetails & { historyId?: string; generatedAt?: n
 
 export function useImageGenerator() {
   const [tokens, setTokens] = useState<Record<ProviderType, string>>({
+    a4f: '',
     gitee: '',
     huggingface: '',
     modelscope: '',

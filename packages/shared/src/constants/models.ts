@@ -8,8 +8,8 @@ import type { ModelConfig, ProviderType } from '../types/provider'
 export const MODEL_CONFIGS: ModelConfig[] = [
   // A4F models (OpenAI-compatible)
   {
-    id: 'gpt-image-1',
-    name: 'GPT Image 1',
+    id: 'provider-4/imagen-3.5',
+    name: 'Imagen 3.5 (provider-4)',
     provider: 'a4f',
     features: {
       negativePrompt: false,
@@ -18,8 +18,38 @@ export const MODEL_CONFIGS: ModelConfig[] = [
     },
   },
   {
-    id: 'dall-e-3',
-    name: 'DALL-E 3',
+    id: 'provider-4/imagen-4',
+    name: 'Imagen 4 (provider-4)',
+    provider: 'a4f',
+    features: {
+      negativePrompt: false,
+      steps: { min: 1, max: 1, default: 1 },
+      seed: false,
+    },
+  },
+  {
+    id: 'provider-8/imagen-3',
+    name: 'Imagen 3 (provider-8)',
+    provider: 'a4f',
+    features: {
+      negativePrompt: false,
+      steps: { min: 1, max: 1, default: 1 },
+      seed: false,
+    },
+  },
+  {
+    id: 'provider-4/flux-schnell',
+    name: 'FLUX Schnell (provider-4)',
+    provider: 'a4f',
+    features: {
+      negativePrompt: false,
+      steps: { min: 1, max: 1, default: 1 },
+      seed: false,
+    },
+  },
+  {
+    id: 'provider-8/z-image',
+    name: 'Z-Image (provider-8)',
     provider: 'a4f',
     features: {
       negativePrompt: false,

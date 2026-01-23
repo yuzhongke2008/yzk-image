@@ -13,7 +13,10 @@ describe('a4fImage', () => {
 
   it('throws AUTH_REQUIRED when no token provided', async () => {
     await expect(
-      a4fImage.generate({ prompt: 'a cat', width: 1024, height: 1024, model: 'gpt-image-1' }, null)
+      a4fImage.generate(
+        { prompt: 'a cat', width: 1024, height: 1024, model: 'provider-4/imagen-3.5' },
+        null
+      )
     ).rejects.toMatchObject({ code: ApiErrorCode.AUTH_REQUIRED })
   })
 
@@ -25,7 +28,7 @@ describe('a4fImage', () => {
     } as Response)
 
     const result = await a4fImage.generate(
-      { prompt: 'a cat', width: 1024, height: 768, model: 'gpt-image-1' },
+      { prompt: 'a cat', width: 1024, height: 768, model: 'provider-4/imagen-3.5' },
       'tok'
     )
 
@@ -42,7 +45,7 @@ describe('a4fImage', () => {
 
     const body = JSON.parse((mockFetch.mock.calls[0]?.[1]?.body as string) || '{}')
     expect(body).toMatchObject({
-      model: 'gpt-image-1',
+      model: 'provider-4/imagen-3.5',
       prompt: 'a cat',
       n: 1,
       size: '1024x768',
