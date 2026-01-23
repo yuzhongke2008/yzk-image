@@ -37,7 +37,7 @@ export function Header({ children, onSettingsClick, onHistoryClick, hasToken }: 
 
       <div className="flex items-center gap-2">
         {children}
-        {onHistoryClick && (
+        {false && onHistoryClick && (
           <button
             type="button"
             onClick={onHistoryClick}
