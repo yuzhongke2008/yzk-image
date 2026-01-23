@@ -4,39 +4,30 @@ export async function onRequest(context) {
 
   const USERNAME = env.BASIC_AUTH_USER;
   const PASSWORD = env.BASIC_AUTH_PASS;
-  
-  // 安全保障：如果没配变量，直接报错，不给任何漏洞
-  if (!USERNAME || !PASSWORD) {
-    return new Response("Configuration Error", { status: 500 });
-  }
-
-  const auth = request.headers.get('Authorization');
   const expectedAuth = `Basic ${btoa(`${USERNAME}:${PASSWORD}`)}`;
+  const auth = request.headers.get('Authorization');
 
-  // 1. 核心验证：如果凭据正确，无论是什么请求都放行
+  // 1. 如果密码正确，通行证直接放行（最高优先级）
   if (auth === expectedAuth) {
     return await context.next();
   }
 
-  // 2. 核心逻辑：如果凭据错误或缺失
-  // 针对 /v1/ 的处理
+  // 2. 如果密码错误或没带密码
+  // 判断是否为 API 请求（Hono 路由路径）
   if (url.pathname.startsWith('/v1/')) {
-    // 关键点：我们依然返回 401 触发浏览器验证，
-    // 但通过这种方式，浏览器会意识到整个域（Same-origin）都需要验证。
-    return new Response('Unauthorized', {
-      status: 401,
-      headers: {
-        'WWW-Authenticate': 'Basic realm="Secure Area"',
-        'Content-Type': 'text/plain',
-      },
+    // 关键点：返回 401，但【严禁】携带 'WWW-Authenticate' 头
+    // 这会让 API 请求静默失败（返回错误），而不会导致浏览器弹窗死循环
+    return new Response('API Unauthorized', { 
+      status: 401 
     });
   }
 
-  // 3. 针对普通页面的处理
+  // 3. 只有当用户直接访问网页（非 v1 路径）时，才触发浏览器弹窗
   return new Response('Unauthorized', {
     status: 401,
     headers: {
       'WWW-Authenticate': 'Basic realm="Secure Area"',
+      'Cache-Control': 'no-cache',
     },
   });
 }
