@@ -1,8 +1,4 @@
-import { useTranslation } from 'react-i18next'
-
+// apps/web/src/components/feature/ImageHistory.tsx
 export function ImageHistory() {
-  const { t } = useTranslation()
-  
-  // 核心修改：强制返回 null，这个组件在任何地方被调用都不会渲染任何东西
-  return null; 
+  return null; // 物理切断：组件不渲染任何内容
 }
