@@ -5,24 +5,31 @@ export async function onRequest(context) {
   const USERNAME = env.BASIC_AUTH_USER;
   const PASSWORD = env.BASIC_AUTH_PASS;
   const expectedAuth = `Basic ${btoa(`${USERNAME}:${PASSWORD}`)}`;
+  
+  // 获取认证头和 Cookie
   const auth = request.headers.get('Authorization');
+  const cookie = request.headers.get('Cookie') || '';
+  const isAuthByCookie = cookie.includes('authorized=true');
 
-  // 1. 如果密码正确，通行证直接放行（最高优先级）
-  if (auth === expectedAuth) {
-    return await context.next();
+  // 1. 如果有正确的 Auth 头 或 有认证 Cookie，直接放行
+  if (auth === expectedAuth || isAuthByCookie) {
+    const response = await context.next();
+    
+    // 如果是第一次通过 Basic Auth 验证成功，顺便种下一个 Cookie
+    if (auth === expectedAuth) {
+      response.headers.append('Set-Cookie', 'authorized=true; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400');
+    }
+    return response;
   }
 
-  // 2. 如果密码错误或没带密码
-  // 判断是否为 API 请求（Hono 路由路径）
+  // 2. 针对 API 请求 (/v1/)
   if (url.pathname.startsWith('/v1/')) {
-    // 关键点：返回 401，但【严禁】携带 'WWW-Authenticate' 头
-    // 这会让 API 请求静默失败（返回错误），而不会导致浏览器弹窗死循环
-    return new Response('API Unauthorized', { 
-      status: 401 
-    });
+    // 依然返回 401 但不带弹窗头，避免死循环
+    // 此时前端会报错，但没关系，等主页面登录后刷新即可
+    return new Response('API Unauthorized', { status: 401 });
   }
 
-  // 3. 只有当用户直接访问网页（非 v1 路径）时，才触发浏览器弹窗
+  // 3. 针对 HTML 页面请求，弹出登录框
   return new Response('Unauthorized', {
     status: 401,
     headers: {
