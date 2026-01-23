@@ -40,6 +40,10 @@ Example `model` values for `/v1/images/generations`:
 - `a4f/provider-4/imagen-3.5`
 - `a4f/provider-8/z-image`
 
+Chat (LLM) model example:
+
+- `a4f/provider-3/deepseek-v3`
+
 ---
 
 ## Gitee AI

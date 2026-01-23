@@ -7,6 +7,7 @@ export const a4fConfig: ChannelConfig = {
     image: '/images/generations',
     llm: '/chat/completions',
   },
+  llmModels: [{ id: 'provider-3/deepseek-v3', name: 'DeepSeek V3 (provider-3)' }],
   imageModels: [
     { id: 'provider-4/imagen-3.5', name: 'Imagen 3.5 (provider-4)' },
     { id: 'provider-4/imagen-4', name: 'Imagen 4 (provider-4)' },

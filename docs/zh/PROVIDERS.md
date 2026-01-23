@@ -40,6 +40,10 @@ OpenAI 兼容的网关服务商。模型 ID 必须带 provider 前缀（例如 `
 - `a4f/provider-4/imagen-3.5`
 - `a4f/provider-8/z-image`
 
+Chat（LLM）模型示例：
+
+- `a4f/provider-3/deepseek-v3`
+
 ---
 
 ## Gitee AI

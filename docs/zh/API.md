@@ -139,6 +139,10 @@ Provider 路由由 `model` 前缀决定：
 - `hf/<model>` -> HuggingFace（token 可选；支持 `Bearer hf:<token>` 或不传）
 - `deepseek/<model>` -> DeepSeek 官方（需要 `Bearer deepseek:<token>`）
 
+示例（A4F DeepSeek）：
+
+- `model: "a4f/provider-3/deepseek-v3"`
+
 请求：
 
 ```json

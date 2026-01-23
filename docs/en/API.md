@@ -139,6 +139,10 @@ Provider routing uses the `model` prefix:
 - `hf/<model>` -> HuggingFace (token optional; supports `Bearer hf:<token>` or no token)
 - `deepseek/<model>` -> DeepSeek Official (requires `Bearer deepseek:<token>`)
 
+Example (A4F DeepSeek):
+
+- `model: "a4f/provider-3/deepseek-v3"`
+
 Request:
 
 ```json
