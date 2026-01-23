@@ -2,45 +2,40 @@ export async function onRequest(context) {
   const { request, env } = context;
   const url = new URL(request.url);
 
+  // 1. 读取配置
   const USERNAME = env.BASIC_AUTH_USER;
   const PASSWORD = env.BASIC_AUTH_PASS;
-  
-  if (!USERNAME || !PASSWORD) {
-    return new Response("Auth Env Missing", { status: 500 });
-  }
-
   const expectedAuth = `Basic ${btoa(`${USERNAME}:${PASSWORD}`)}`;
   const auth = request.headers.get('Authorization');
   const cookie = request.headers.get('Cookie') || '';
   const isAuthByCookie = cookie.includes('authorized=true');
 
-  // --- 核心逻辑：验证凭证 ---
-  const isAuthenticated = (auth === expectedAuth || isAuthByCookie);
+  // 2. 验证判断：必须有正确 Header 或 有效登录 Cookie
+  const hasAccess = (auth === expectedAuth || isAuthByCookie);
 
-  // 1. 如果验证通过：放行并种下/更新 Cookie
-  if (isAuthenticated) {
+  if (hasAccess) {
     const response = await context.next();
-    // 只有在通过 Basic Auth 或还没种下 Cookie 时才设置 Set-Cookie
+    // 登录成功时，种下长效安全 Cookie (30天免登录)
     if (auth === expectedAuth) {
       response.headers.append('Set-Cookie', 'authorized=true; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000');
     }
     return response;
   }
 
-  // 2. 如果验证未通过：
-  // 如果是 API 请求 (/v1/)，直接拒绝访问，不给数据，也不弹窗（防止死循环）
+  // 3. 针对不同路径的拦截策略
+  // 如果是后台接口 /v1/ (处理历史记录、生成请求等)
   if (url.pathname.startsWith('/v1/')) {
-    return new Response(JSON.stringify({ error: "Unauthorized Access" }), { 
-      status: 401,
-      headers: { 'Content-Type': 'application/json' }
+    return new Response(JSON.stringify({ error: "No permission" }), { 
+      status: 403, 
+      headers: { 'Content-Type': 'application/json' } 
     });
   }
 
-  // 3. 如果是 HTML 页面访问，触发浏览器 Basic Auth 弹窗
+  // 如果是 HTML 页面，弹出登录框
   return new Response('Unauthorized', {
     status: 401,
     headers: {
-      'WWW-Authenticate': 'Basic realm="ZENITH Secure Admin"',
+      'WWW-Authenticate': 'Basic realm="ZENITH AI Secure"',
       'Cache-Control': 'no-cache',
     },
   });
