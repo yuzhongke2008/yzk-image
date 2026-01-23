@@ -1,11 +1,29 @@
-import { Errors, getModelsByProvider, PROVIDER_CONFIGS } from '@z-image/shared'
+import { Errors, getModelsByProvider } from '@z-image/shared'
 import { Hono } from 'hono'
+import { ensureCustomChannelsInitialized, getChannel, getImageChannel } from '../channels'
+import { parseTokens, runWithTokenRotation } from '../core/token-manager'
 import { bodyLimit, rateLimitPresets, sendError, timeout } from '../middleware'
-import { getProvider } from '../providers'
 import { convertRequest, convertResponse, parseBearerToken } from './adapter'
 import { handleChatCompletion } from './chat'
 import { resolveModel } from './model-resolver'
 import type { OpenAIImageRequest, OpenAIModelsListResponse } from './types'
+
+function resolveImageChannel(modelParam?: string): { channelId: string; model: string } {
+  const raw = (modelParam || '').trim()
+  if (raw.startsWith('custom/')) {
+    const rest = raw.slice('custom/'.length)
+    const firstSlash = rest.indexOf('/')
+    if (firstSlash > 0) {
+      const channelId = rest.slice(0, firstSlash).trim()
+      const model = rest.slice(firstSlash + 1).trim()
+      if (channelId && model) return { channelId, model }
+      if (channelId) return { channelId, model }
+    }
+  }
+
+  const resolved = resolveModel(modelParam)
+  return { channelId: resolved.provider, model: resolved.model }
+}
 
 function listModels(): OpenAIModelsListResponse {
   const created = 1700000000
@@ -52,6 +70,10 @@ export function registerOpenAIRoutes(app: Hono) {
   v1.use('/*', timeout(120000))
 
   v1.post('/images/generations', bodyLimit(50 * 1024), rateLimitPresets.generate, async (c) => {
+    ensureCustomChannelsInitialized(
+      c.env as unknown as Record<string, string | undefined> | undefined
+    )
+
     let body: OpenAIImageRequest
     try {
       body = (await c.req.json()) as OpenAIImageRequest
@@ -74,10 +96,10 @@ export function registerOpenAIRoutes(app: Hono) {
       )
     }
 
-    const { provider, model } = resolveModel(body.model)
+    const { channelId, model } = resolveImageChannel(body.model)
     const auth = parseBearerToken(c.req.header('Authorization'))
 
-    if (auth.providerHint && auth.providerHint !== provider) {
+    if (auth.providerHint && auth.providerHint !== channelId) {
       return sendError(
         c,
         Errors.invalidParams(
@@ -87,19 +109,30 @@ export function registerOpenAIRoutes(app: Hono) {
       )
     }
 
-    const providerConfig = PROVIDER_CONFIGS[provider]
-    if (providerConfig?.requiresAuth && !auth.token) {
-      return sendError(c, Errors.authRequired(providerConfig.name))
+    const channel = getChannel(channelId)
+    const imageChannel = getImageChannel(channelId)
+    if (!channel || !imageChannel) {
+      return sendError(c, Errors.invalidProvider(channelId))
+    }
+
+    const resolvedModel = model || channel.config.imageModels?.[0]?.id
+
+    const allowAnonymous =
+      channel.config.auth.type === 'none' || channel.config.auth.optional === true
+    const headerTokens = parseTokens(auth.token)
+    const tokens = headerTokens.length ? headerTokens : channel.config.tokens || []
+    if (!allowAnonymous && tokens.length === 0) {
+      return sendError(c, Errors.authRequired(channel.name))
     }
 
     try {
       const internalReq = convertRequest(body)
-      const imageProvider = getProvider(provider)
-      const result = await imageProvider.generate({
-        ...internalReq,
-        model,
-        authToken: auth.token,
-      })
+      const result = await runWithTokenRotation(
+        channel.id,
+        tokens,
+        (token) => imageChannel.generate({ ...internalReq, model: resolvedModel }, token),
+        { allowAnonymous }
+      )
       // Return raw URL for compatibility with OpenAI "url" response_format.
       return c.json(convertResponse(result))
     } catch (err) {

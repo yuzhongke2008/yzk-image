@@ -1,13 +1,12 @@
-import { Errors, LLM_PROVIDER_CONFIGS } from '@z-image/shared'
+import { Errors } from '@z-image/shared'
 import type { Context } from 'hono'
-import { getLLMProvider, hasLLMProvider } from '../llm-providers'
+import { ensureCustomChannelsInitialized, getChannel, getLLMChannel } from '../channels'
+import { parseTokens, runWithTokenRotation } from '../core/token-manager'
 import { sendError } from '../middleware'
 import type { OpenAIChatRequest, OpenAIChatResponse } from './types'
 
-type LLMProviderId = keyof typeof LLM_PROVIDER_CONFIGS
-
 function parseChatBearerToken(authHeader?: string): {
-  providerHint?: LLMProviderId
+  providerHint?: string
   token?: string
 } {
   if (!authHeader) return {}
@@ -18,15 +17,15 @@ function parseChatBearerToken(authHeader?: string): {
 
   if (raw.startsWith('gitee:')) {
     const token = raw.slice('gitee:'.length).trim()
-    return token ? { providerHint: 'gitee-llm', token } : {}
+    return token ? { providerHint: 'gitee', token } : {}
   }
   if (raw.startsWith('ms:')) {
     const token = raw.slice('ms:'.length).trim()
-    return token ? { providerHint: 'modelscope-llm', token } : {}
+    return token ? { providerHint: 'modelscope', token } : {}
   }
   if (raw.startsWith('hf:')) {
     const token = raw.slice('hf:'.length).trim()
-    return token ? { providerHint: 'huggingface-llm', token } : {}
+    return token ? { providerHint: 'huggingface', token } : {}
   }
   if (raw.startsWith('deepseek:')) {
     const token = raw.slice('deepseek:'.length).trim()
@@ -36,23 +35,41 @@ function parseChatBearerToken(authHeader?: string): {
   return { token: raw }
 }
 
-function resolveChatModel(model: string): { provider: LLMProviderId; model: string } {
+function resolveChatModel(model: string): {
+  channelId: string
+  model: string
+  forceAnonymous?: boolean
+} {
   const trimmed = model.trim()
-  if (!trimmed) return { provider: 'pollinations', model: 'openai-fast' }
+  if (!trimmed) return { channelId: 'huggingface', model: 'openai-fast', forceAnonymous: true }
+
+  if (trimmed.startsWith('custom/')) {
+    const rest = trimmed.slice('custom/'.length)
+    const firstSlash = rest.indexOf('/')
+    if (firstSlash > 0) {
+      const channelId = rest.slice(0, firstSlash).trim()
+      const m = rest.slice(firstSlash + 1).trim()
+      if (channelId) return { channelId, model: m }
+    }
+  }
 
   if (trimmed.startsWith('gitee/'))
-    return { provider: 'gitee-llm', model: trimmed.slice('gitee/'.length) }
+    return { channelId: 'gitee', model: trimmed.slice('gitee/'.length) }
   if (trimmed.startsWith('ms/'))
-    return { provider: 'modelscope-llm', model: trimmed.slice('ms/'.length) }
+    return { channelId: 'modelscope', model: trimmed.slice('ms/'.length) }
   if (trimmed.startsWith('hf/'))
-    return { provider: 'huggingface-llm', model: trimmed.slice('hf/'.length) }
+    return { channelId: 'huggingface', model: trimmed.slice('hf/'.length) }
   if (trimmed.startsWith('deepseek/'))
-    return { provider: 'deepseek', model: trimmed.slice('deepseek/'.length) }
+    return { channelId: 'deepseek', model: trimmed.slice('deepseek/'.length) }
   if (trimmed.startsWith('pollinations/'))
-    return { provider: 'pollinations', model: trimmed.slice('pollinations/'.length) }
+    return {
+      channelId: 'huggingface',
+      model: trimmed.slice('pollinations/'.length),
+      forceAnonymous: true,
+    }
 
   // Default: treat as Pollinations model id.
-  return { provider: 'pollinations', model: trimmed }
+  return { channelId: 'huggingface', model: trimmed, forceAnonymous: true }
 }
 
 function getSystemPrompt(messages: OpenAIChatRequest['messages']): string {
@@ -90,6 +107,10 @@ function makeChatResponse(model: string, content: string): OpenAIChatResponse {
 }
 
 export async function handleChatCompletion(c: Context) {
+  ensureCustomChannelsInitialized(
+    c.env as unknown as Record<string, string | undefined> | undefined
+  )
+
   let body: OpenAIChatRequest
   try {
     body = (await c.req.json()) as OpenAIChatRequest
@@ -114,35 +135,50 @@ export async function handleChatCompletion(c: Context) {
   const resolved = resolveChatModel(body.model)
   const auth = parseChatBearerToken(c.req.header('Authorization'))
 
-  if (auth.providerHint && auth.providerHint !== resolved.provider) {
+  if (auth.providerHint && auth.providerHint !== resolved.channelId) {
     return sendError(
       c,
       Errors.invalidParams('Authorization', 'Token prefix does not match requested model provider')
     )
   }
 
-  if (!hasLLMProvider(resolved.provider)) {
+  const channel = getChannel(resolved.channelId)
+  const llm = getLLMChannel(resolved.channelId)
+  if (!channel || !llm) {
     return sendError(
       c,
-      Errors.invalidParams('model', `Unsupported model provider: ${resolved.provider}`)
+      Errors.invalidParams('model', `Unsupported model provider: ${resolved.channelId}`)
     )
   }
 
-  const providerConfig = LLM_PROVIDER_CONFIGS[resolved.provider]
-  if (providerConfig?.needsAuth && !auth.token) {
-    return sendError(c, Errors.authRequired(providerConfig.name))
+  const allowAnonymous =
+    resolved.forceAnonymous === true ||
+    channel.config.auth.type === 'none' ||
+    channel.config.auth.optional === true
+
+  const headerTokens = resolved.forceAnonymous ? [] : parseTokens(auth.token)
+  const tokens = headerTokens.length ? headerTokens : channel.config.tokens || []
+  if (!allowAnonymous && tokens.length === 0) {
+    return sendError(c, Errors.authRequired(channel.name))
   }
 
   try {
-    const llmProvider = getLLMProvider(resolved.provider)
-    const result = await llmProvider.complete({
-      prompt: userPrompt,
-      systemPrompt,
-      model: resolved.model || providerConfig.defaultModel,
-      authToken: auth.token,
-      maxTokens: body.max_tokens,
-      temperature: body.temperature,
-    })
+    const result = await runWithTokenRotation(
+      channel.id,
+      tokens,
+      (token) =>
+        llm.complete(
+          {
+            prompt: userPrompt,
+            systemPrompt,
+            model: resolved.model || channel.config.llmModels?.[0]?.id,
+            maxTokens: body.max_tokens,
+            temperature: body.temperature,
+          },
+          token
+        ),
+      { allowAnonymous }
+    )
 
     return c.json(makeChatResponse(result.model, result.content))
   } catch (err) {

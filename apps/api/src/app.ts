@@ -13,6 +13,7 @@ import {
   requestLogger,
   securityHeaders,
 } from './middleware'
+import './channels'
 import { registerOpenAIRoutes } from './openai/routes'
 
 export interface AppConfig {

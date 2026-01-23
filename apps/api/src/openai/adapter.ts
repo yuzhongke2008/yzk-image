@@ -5,11 +5,11 @@ import {
   validatePrompt,
   validateSteps,
 } from '@z-image/shared'
-import type { ProviderGenerateRequest, ProviderGenerateResult } from '../providers/types'
+import type { ImageRequest, ImageResult } from '../core/types'
 import type { OpenAIImageRequest, OpenAIImageResponse } from './types'
 
 export type OpenAIConvertedRequest = Pick<
-  ProviderGenerateRequest,
+  ImageRequest,
   'prompt' | 'negativePrompt' | 'width' | 'height' | 'steps' | 'seed' | 'guidanceScale'
 >
 
@@ -80,7 +80,7 @@ export function convertRequest(req: OpenAIImageRequest): OpenAIConvertedRequest 
   }
 }
 
-export function convertResponse(result: ProviderGenerateResult): OpenAIImageResponse {
+export function convertResponse(result: ImageResult): OpenAIImageResponse {
   return {
     created: Math.floor(Date.now() / 1000),
     data: [{ url: result.url }],
