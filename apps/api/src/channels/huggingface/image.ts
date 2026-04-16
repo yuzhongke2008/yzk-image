@@ -5,8 +5,24 @@ import { callGradioApi } from '../../utils'
 
 function normalizeImageUrl(baseUrl: string, url: string): string {
   try {
-    return new URL(url, baseUrl).toString()
-  } catch {
+    // 🔧 强制处理各种 URL 格式
+    let normalizedUrl = url
+    
+    // 1. 如果是相对路径，拼接 baseUrl
+    if (normalizedUrl.startsWith('/')) {
+      normalizedUrl = `${baseUrl}${normalizedUrl}`
+    }
+    // 2. 如果是 file= 开头但没有域名，转换为完整 URL
+    else if (normalizedUrl.includes('file=') && !normalizedUrl.startsWith('http')) {
+      normalizedUrl = `${baseUrl}/file=${normalizedUrl.split('file=').pop()}`
+    }
+    // 3. 如果是完整 URL，直接使用
+    
+    // 4. 转换为标准 URL 对象并添加缓存破坏参数
+    const finalUrl = new URL(normalizedUrl, baseUrl).toString()
+    return `${finalUrl}${finalUrl.includes('?') ? '&' : '?'}t=${Date.now()}`
+  } catch (error) {
+    console.error('Failed to normalize image URL:', url, error)
     return url
   }
 }
@@ -39,6 +55,13 @@ function isNotFoundProviderError(err: unknown): boolean {
   return false
 }
 
+function isRetryableError(err: unknown): boolean {
+  const msg = String(err)
+  const is503 = msg.includes('503') || msg.includes('temporarily unavailable') || msg.includes('loading')
+  const isNetwork = msg.includes('fetch') || msg.includes('network') || msg.includes('timeout') || msg.includes('ECONNRESET')
+  return is503 || isNetwork
+}
+
 const MODEL_CONFIGS: Record<
   string,
   { endpoint: string; buildData: (r: ImageRequest, seed: number) => unknown[] }
@@ -66,31 +89,57 @@ export const huggingfaceImage: ImageCapability = {
     const seed = request.seed ?? Math.floor(Math.random() * MAX_INT32)
     const modelId = request.model || 'z-image-turbo'
     const config = MODEL_CONFIGS[modelId] || MODEL_CONFIGS['z-image-turbo']
-
     let lastErr: unknown
     let imageUrl: string | undefined
     let data: unknown[] | undefined
 
     for (const baseUrl of getCandidateBaseUrls(modelId)) {
-      try {
-        data = await callGradioApi(
-          baseUrl,
-          config.endpoint,
-          config.buildData(request, seed),
-          token || undefined
-        )
-        const result = data as Array<{ url?: string } | number | string>
-        const first = result[0]
-        const rawUrl =
-          typeof first === 'string' ? first : (first as { url?: string } | null | undefined)?.url
-        imageUrl = rawUrl ? normalizeImageUrl(baseUrl, rawUrl) : undefined
-        if (!imageUrl) throw Errors.generationFailed('HuggingFace', 'No image returned')
-        break
-      } catch (err) {
-        lastErr = err
-        if (isNotFoundProviderError(err)) continue
-        throw err
+      let retries = 0
+      const maxRetries = 3
+      let success = false
+
+      while (retries < maxRetries && !success) {
+        try {
+          if (retries > 0) {
+            await new Promise((res) => setTimeout(res, 1500 * retries))
+          }
+
+          data = await callGradioApi(
+            baseUrl,
+            config.endpoint,
+            config.buildData(request, seed),
+            token || undefined
+          )
+
+          const result = data as Array<{ url?: string } | number | string>
+          const first = result[0]
+          const rawUrl =
+            typeof first === 'string' ? first : (first as { url?: string } | null | undefined)?.url
+          
+          if (!rawUrl) {
+            console.error('No URL in response:', result)
+            throw Errors.generationFailed('HuggingFace', 'No image URL in response')
+          }
+          
+          imageUrl = normalizeImageUrl(baseUrl, rawUrl)
+          console.log('✅ Generated image URL:', imageUrl)
+          
+          if (!imageUrl) throw Errors.generationFailed('HuggingFace', 'No image returned')
+          
+          success = true
+        } catch (err) {
+          lastErr = err
+          if (isNotFoundProviderError(err)) {
+            break
+          }
+          if (isRetryableError(err) && retries < maxRetries - 1) {
+            retries++
+            continue
+          }
+          break
+        }
       }
+      if (success) break
     }
 
     if (!imageUrl) {
